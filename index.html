@@ -29,16 +29,20 @@
     textarea { min-height:160px; resize:vertical; }
     .small { font-size:12px; }
     .two { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+    .three { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; }
     @media (max-width: 420px){ .grid{ grid-template-columns: 1.2fr .8fr .8fr .7fr; } }
   </style>
 </head>
+
 <body>
 <header>
   <h1>📦 Stock Take → Orders</h1>
+
   <div class="row">
     <select id="supplierFilter"></select>
     <input id="search" placeholder="Cerca item (es. Etna, Moscato…)" />
   </div>
+
   <div class="row">
     <button id="showAllBtn">Tutti</button>
     <button id="onlyToOrderBtn">Solo da ordinare</button>
@@ -48,12 +52,19 @@
 
 <main>
   <div class="card">
-    <div class="two">
-      <button id="addItemBtn">+ Aggiungi item</button>
+    <div class="three">
+      <button id="addSupplierBtn">+ Supplier</button>
+      <button id="addItemBtn">+ Item</button>
+      <button id="manageSuppliersBtn">Gestisci supplier</button>
+    </div>
+
+    <div class="two" style="margin-top:8px;">
+      <button id="exportBtn">Export backup (JSON)</button>
       <button class="danger" id="resetBtn">Reset dati (attenzione)</button>
     </div>
+
     <div class="muted" style="margin-top:8px;">
-      Suggerimento: compila <b>Stock</b> e <b>Par</b>. “Da ordinare” = max(0, Par - Stock).
+      Compila <b>Stock</b> e <b>Par</b>. “Da ordinare” = max(0, Par - Stock). Tutto salva automaticamente.
     </div>
   </div>
 
@@ -74,8 +85,9 @@
 </main>
 
 <script>
-  const STORAGE_KEY = "restaurant_orders_v1";
+  const STORAGE_KEY = "restaurant_orders_v2";
 
+  // --------- SEED DATA (la tua lista) ----------
   const seedItems = [
     // Alepat Taylor
     { supplier:"Alepat Taylor", category:"Wine", item:"Fantini Calalenta Rosato", unit:"bt", stock:0, par:0, note:"" },
@@ -104,16 +116,22 @@
     { supplier:"Twelve Bottles", category:"Wine", item:"Bellavista Gran Cuvée Alma Franciacorta", unit:"bt", stock:0, par:0, note:"" },
   ];
 
-  let state = { items: [], ui: { supplier:"ALL", onlyToOrder:false, search:"" } };
+  const seedSuppliers = Array.from(new Set(seedItems.map(x => x.supplier))).sort((a,b)=>a.localeCompare(b));
 
-  function load() {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) { state.items = seedItems; save(); return; }
-    try {
-      const parsed = JSON.parse(raw);
-      if (parsed?.items?.length) state = parsed;
-      else { state.items = seedItems; save(); }
-    } catch { state.items = seedItems; save(); }
+  // --------- STATE ----------
+  let state = {
+    suppliers: [],
+    items: [],
+    ui: { supplier:"ALL", onlyToOrder:false, search:"" }
+  };
+
+  // --------- UTIL ----------
+  function uniq(arr){ return Array.from(new Set(arr)); }
+  function cleanName(s){ return (s||"").trim().replace(/\s+/g," "); }
+  function calcToOrder(it){
+    const s = Number(it.stock)||0;
+    const p = Number(it.par)||0;
+    return Math.max(0, p - s);
   }
 
   function save() {
@@ -123,19 +141,68 @@
     hint.textContent = "Salvato automaticamente • " + now.toLocaleString();
   }
 
-  function uniqSuppliers(items){
-    return Array.from(new Set(items.map(x => x.supplier))).sort((a,b)=>a.localeCompare(b));
+  function migrateIfNeeded(parsed){
+    // v1 -> v2: se non c'è suppliers, deriviamoli dagli items
+    if (!parsed) return null;
+
+    const out = {
+      suppliers: Array.isArray(parsed.suppliers) ? parsed.suppliers : [],
+      items: Array.isArray(parsed.items) ? parsed.items : [],
+      ui: parsed.ui || { supplier:"ALL", onlyToOrder:false, search:"" }
+    };
+
+    if (!out.suppliers.length && out.items.length){
+      out.suppliers = uniq(out.items.map(x => x.supplier)).map(cleanName).sort((a,b)=>a.localeCompare(b));
+    }
+
+    // Normalizza supplier name sugli item
+    out.items = out.items.map(it => ({
+      supplier: cleanName(it.supplier),
+      category: cleanName(it.category || "Wine") || "Wine",
+      item: cleanName(it.item),
+      unit: cleanName(it.unit || "bt") || "bt",
+      stock: Number(it.stock)||0,
+      par: Number(it.par)||0,
+      note: it.note || ""
+    })).filter(it => it.supplier && it.item);
+
+    // Se ci sono item con supplier non in lista, aggiungili
+    const missing = out.items.map(x=>x.supplier).filter(s => !out.suppliers.includes(s));
+    if (missing.length){
+      out.suppliers = uniq([...out.suppliers, ...missing]).sort((a,b)=>a.localeCompare(b));
+    }
+
+    return out;
   }
 
-  function calcToOrder(it){
-    const s = Number(it.stock)||0;
-    const p = Number(it.par)||0;
-    return Math.max(0, p - s);
+  function load() {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) {
+      state.items = seedItems;
+      state.suppliers = seedSuppliers;
+      save();
+      return;
+    }
+    try {
+      const parsed = JSON.parse(raw);
+      const migrated = migrateIfNeeded(parsed);
+      if (migrated) state = migrated;
+      else {
+        state.items = seedItems;
+        state.suppliers = seedSuppliers;
+      }
+      save();
+    } catch {
+      state.items = seedItems;
+      state.suppliers = seedSuppliers;
+      save();
+    }
   }
 
+  // --------- RENDER ----------
   function renderSupplierFilter(){
     const sel = document.getElementById("supplierFilter");
-    const options = ["ALL", ...uniqSuppliers(state.items)];
+    const options = ["ALL", ...state.suppliers.slice().sort((a,b)=>a.localeCompare(b))];
     sel.innerHTML = options.map(v => `<option value="${v}">${v === "ALL" ? "Tutti i supplier" : v}</option>`).join("");
     sel.value = state.ui.supplier || "ALL";
   }
@@ -143,7 +210,7 @@
   function passesFilters(it){
     const sOk = (state.ui.supplier === "ALL") || it.supplier === state.ui.supplier;
     const q = (state.ui.search||"").trim().toLowerCase();
-    const searchOk = !q || (it.item.toLowerCase().includes(q) || it.category.toLowerCase().includes(q));
+    const searchOk = !q || (it.item.toLowerCase().includes(q) || it.category.toLowerCase().includes(q) || it.supplier.toLowerCase().includes(q));
     const orderOk = !state.ui.onlyToOrder || calcToOrder(it) > 0;
     return sOk && searchOk && orderOk;
   }
@@ -160,7 +227,7 @@
       return;
     }
 
-    root.innerHTML = items.map((it, idx) => {
+    root.innerHTML = items.map((it) => {
       const toOrder = calcToOrder(it);
       const pill = toOrder > 0 ? `<span class="pill">Da ordinare: <b>${toOrder}</b></span>` : `<span class="pill">OK</span>`;
       const globalIndex = state.items.indexOf(it);
@@ -189,13 +256,14 @@
           <button class="danger" data-del="${globalIndex}">X</button>
         </div>
 
-        <div style="margin-top:10px;">
+        <div style="margin-top:10px;" class="two">
           <input placeholder="Note (opzionale)" value="${it.note || ""}" data-field="note" data-i="${globalIndex}">
+          <button data-edit="${globalIndex}">Modifica</button>
         </div>
       </div>`;
     }).join("");
 
-    // Bind inputs
+    // Inputs
     root.querySelectorAll("input[data-field]").forEach(inp => {
       inp.addEventListener("input", e => {
         const i = Number(e.target.dataset.i);
@@ -204,11 +272,11 @@
         if (field === "stock" || field === "par") val = Number(val || 0);
         state.items[i][field] = val;
         save();
-        renderList(); // update computed
+        renderList();
       });
     });
 
-    // Delete
+    // Delete item
     root.querySelectorAll("button[data-del]").forEach(btn => {
       btn.addEventListener("click", e => {
         const i = Number(e.target.dataset.del);
@@ -219,8 +287,41 @@
         renderList();
       });
     });
+
+    // Edit item (nome, categoria, unità, supplier)
+    root.querySelectorAll("button[data-edit]").forEach(btn => {
+      btn.addEventListener("click", e => {
+        const i = Number(e.target.dataset.edit);
+        const it = state.items[i];
+
+        const newName = cleanName(prompt("Nome item:", it.item));
+        if (!newName) return;
+
+        const newSupplier = pickSupplierPrompt("Seleziona supplier per questo item:", it.supplier);
+        if (!newSupplier) return;
+
+        const newCategory = cleanName(prompt("Categoria:", it.category || "Wine")) || "Wine";
+        const newUnit = cleanName(prompt("Unità:", it.unit || "bt")) || "bt";
+
+        it.item = newName;
+        it.supplier = newSupplier;
+        it.category = newCategory;
+        it.unit = newUnit;
+
+        // Se il supplier non esiste, aggiungilo
+        if (!state.suppliers.includes(newSupplier)) {
+          state.suppliers.push(newSupplier);
+          state.suppliers.sort((a,b)=>a.localeCompare(b));
+        }
+
+        save();
+        renderSupplierFilter();
+        renderList();
+      });
+    });
   }
 
+  // --------- ORDER TEXT ----------
   function generateOrderText(){
     const itemsToOrder = state.items
       .map(it => ({...it, toOrder: calcToOrder(it)}))
@@ -258,29 +359,188 @@
     });
   }
 
-  function addItem(){
-    const supplier = prompt("Supplier (es. Winestock, Arquilla, Twelve Bottles):");
+  // --------- SUPPLIERS: CREATE / DELETE ----------
+  function addSupplier(){
+    const name = cleanName(prompt("Nome nuovo supplier:"));
+    if (!name) return;
+
+    if (state.suppliers.some(s => s.toLowerCase() === name.toLowerCase())) {
+      alert("Esiste già un supplier con questo nome.");
+      return;
+    }
+
+    state.suppliers.push(name);
+    state.suppliers.sort((a,b)=>a.localeCompare(b));
+    save();
+    renderSupplierFilter();
+    alert("Supplier aggiunto ✅");
+  }
+
+  function deleteSupplierFlow(){
+    if (!state.suppliers.length) {
+      alert("Non hai supplier da gestire.");
+      return;
+    }
+
+    const supplier = pickSupplierPrompt("Quale supplier vuoi cancellare?", "");
     if (!supplier) return;
-    const item = prompt("Nome item:");
+
+    const itemsCount = state.items.filter(it => it.supplier === supplier).length;
+
+    const ok = confirm(
+      `Cancellare supplier "${supplier}"?\n\n` +
+      `Questo rimuoverà anche ${itemsCount} item collegati.\n\n` +
+      `Vuoi procedere?`
+    );
+    if (!ok) return;
+
+    // Rimuovi items del supplier
+    state.items = state.items.filter(it => it.supplier !== supplier);
+
+    // Rimuovi supplier
+    state.suppliers = state.suppliers.filter(s => s !== supplier);
+
+    // Se filtro era su quel supplier, reset
+    if (state.ui.supplier === supplier) state.ui.supplier = "ALL";
+
+    save();
+    renderSupplierFilter();
+    renderList();
+    alert("Supplier eliminato ✅");
+  }
+
+  function manageSuppliers(){
+    const choice = prompt(
+      "Gestisci supplier:\n" +
+      "1 = Elimina supplier\n" +
+      "2 = Rinomina supplier\n" +
+      "3 = Lista supplier\n\n" +
+      "Scrivi 1 / 2 / 3"
+    );
+
+    if (!choice) return;
+
+    if (choice.trim() === "1") {
+      deleteSupplierFlow();
+      return;
+    }
+
+    if (choice.trim() === "2") {
+      renameSupplierFlow();
+      return;
+    }
+
+    if (choice.trim() === "3") {
+      alert("Supplier:\n\n" + state.suppliers.join("\n"));
+      return;
+    }
+
+    alert("Scelta non valida.");
+  }
+
+  function renameSupplierFlow(){
+    const oldName = pickSupplierPrompt("Quale supplier vuoi rinominare?", "");
+    if (!oldName) return;
+
+    const newName = cleanName(prompt(`Nuovo nome per "${oldName}":`, oldName));
+    if (!newName) return;
+
+    if (oldName === newName) return;
+
+    if (state.suppliers.some(s => s.toLowerCase() === newName.toLowerCase())) {
+      alert("Esiste già un supplier con questo nome.");
+      return;
+    }
+
+    // aggiorna supplier list
+    state.suppliers = state.suppliers.map(s => s === oldName ? newName : s);
+
+    // aggiorna items
+    state.items = state.items.map(it => it.supplier === oldName ? {...it, supplier:newName} : it);
+
+    // aggiorna filtro
+    if (state.ui.supplier === oldName) state.ui.supplier = newName;
+
+    state.suppliers.sort((a,b)=>a.localeCompare(b));
+    save();
+    renderSupplierFilter();
+    renderList();
+    alert("Supplier rinominato ✅");
+  }
+
+  // Prompt “picker” semplice (mobile-friendly)
+  function pickSupplierPrompt(title, current){
+    const list = state.suppliers.slice().sort((a,b)=>a.localeCompare(b));
+    const txt =
+      `${title}\n\n` +
+      list.map((s, idx)=>`${idx+1}. ${s}`).join("\n") +
+      `\n\nScrivi il numero (1-${list.length})` +
+      (current ? `\n(Attuale: ${current})` : "");
+    const ans = prompt(txt);
+    if (!ans) return null;
+    const n = Number(ans);
+    if (!Number.isFinite(n) || n < 1 || n > list.length) {
+      alert("Numero non valido.");
+      return null;
+    }
+    return list[n-1];
+  }
+
+  // --------- ITEMS: CREATE ----------
+  function addItem(){
+    if (!state.suppliers.length){
+      alert("Prima crea almeno un supplier.");
+      return;
+    }
+
+    const supplier = pickSupplierPrompt("Seleziona supplier per il nuovo item:", "");
+    if (!supplier) return;
+
+    const item = cleanName(prompt("Nome item:"));
     if (!item) return;
-    const category = prompt("Categoria (Wine/Beer/Spirits/Food…):", "Wine") || "Wine";
-    const unit = prompt("Unità (bt/kg/ctn…):", "bt") || "bt";
+
+    const category = cleanName(prompt("Categoria (Wine/Beer/Spirits/Food…):", "Wine")) || "Wine";
+    const unit = cleanName(prompt("Unità (bt/kg/ctn…):", "bt")) || "bt";
+
+    // evita duplicati uguali (stesso supplier + item)
+    const exists = state.items.some(x =>
+      x.supplier.toLowerCase() === supplier.toLowerCase() &&
+      x.item.toLowerCase() === item.toLowerCase()
+    );
+    if (exists) {
+      alert("Questo item esiste già per quel supplier.");
+      return;
+    }
+
     state.items.push({ supplier, category, item, unit, stock:0, par:0, note:"" });
     save();
     renderSupplierFilter();
     renderList();
   }
 
+  // --------- RESET / EXPORT ----------
   function resetAll(){
     if (!confirm("Reset totale: ripristino lista iniziale e cancello modifiche. Sicuro?")) return;
-    state = { items: seedItems, ui: { supplier:"ALL", onlyToOrder:false, search:"" } };
+    state = { suppliers: seedSuppliers, items: seedItems, ui: { supplier:"ALL", onlyToOrder:false, search:"" } };
     save();
     renderSupplierFilter();
     renderList();
     document.getElementById("orderText").value = "";
   }
 
-  // Init
+  function exportBackup(){
+    const blob = new Blob([JSON.stringify(state, null, 2)], {type:"application/json"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "orders-backup.json";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  // --------- INIT ----------
   load();
   renderSupplierFilter();
   renderList();
@@ -317,6 +577,9 @@
 
   document.getElementById("copyBtn").addEventListener("click", copyOrder);
   document.getElementById("addItemBtn").addEventListener("click", addItem);
+  document.getElementById("addSupplierBtn").addEventListener("click", addSupplier);
+  document.getElementById("manageSuppliersBtn").addEventListener("click", manageSuppliers);
+  document.getElementById("exportBtn").addEventListener("click", exportBackup);
   document.getElementById("resetBtn").addEventListener("click", resetAll);
 
   // Service worker
@@ -326,3 +589,4 @@
 </script>
 </body>
 </html>
+
