@@ -1,0 +1,328 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Orders – Stock Take</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#111111" />
+  <style>
+    :root { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; }
+    body { margin:0; background:#0b0b0b; color:#f3f3f3; }
+    header { position:sticky; top:0; background:#111; padding:12px 12px 10px; border-bottom:1px solid #222; z-index:10;}
+    h1 { margin:0; font-size:16px; letter-spacing:.2px; }
+    .row { display:flex; gap:8px; margin-top:10px; }
+    select, input, button, textarea {
+      width:100%; padding:10px; border-radius:10px; border:1px solid #2a2a2a;
+      background:#141414; color:#f3f3f3; font-size:14px;
+    }
+    button { background:#1f1f1f; cursor:pointer; }
+    button.primary { background:#2b6cff; border-color:#2b6cff; }
+    button.danger { background:#c53939; border-color:#c53939; }
+    main { padding:12px; }
+    .card { background:#111; border:1px solid #222; border-radius:14px; padding:12px; margin:10px 0; }
+    .grid { display:grid; grid-template-columns: 1.3fr .7fr .7fr .8fr; gap:8px; align-items:center; }
+    .muted { color:#b6b6b6; font-size:12px; }
+    .pill { display:inline-block; padding:4px 8px; border-radius:999px; background:#1a1a1a; border:1px solid #2a2a2a; font-size:12px; }
+    .qty { text-align:center; font-variant-numeric: tabular-nums; }
+    .hr { height:1px; background:#222; margin:10px 0; }
+    textarea { min-height:160px; resize:vertical; }
+    .small { font-size:12px; }
+    .two { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+    @media (max-width: 420px){ .grid{ grid-template-columns: 1.2fr .8fr .8fr .7fr; } }
+  </style>
+</head>
+<body>
+<header>
+  <h1>📦 Stock Take → Orders</h1>
+  <div class="row">
+    <select id="supplierFilter"></select>
+    <input id="search" placeholder="Cerca item (es. Etna, Moscato…)" />
+  </div>
+  <div class="row">
+    <button id="showAllBtn">Tutti</button>
+    <button id="onlyToOrderBtn">Solo da ordinare</button>
+    <button class="primary" id="generateBtn">Genera ordine</button>
+  </div>
+</header>
+
+<main>
+  <div class="card">
+    <div class="two">
+      <button id="addItemBtn">+ Aggiungi item</button>
+      <button class="danger" id="resetBtn">Reset dati (attenzione)</button>
+    </div>
+    <div class="muted" style="margin-top:8px;">
+      Suggerimento: compila <b>Stock</b> e <b>Par</b>. “Da ordinare” = max(0, Par - Stock).
+    </div>
+  </div>
+
+  <div id="list"></div>
+
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;">
+      <div>
+        <div style="font-weight:600;">📲 Testo ordine (raggruppato per supplier)</div>
+        <div class="muted">Copia e incolla su WhatsApp / Email</div>
+      </div>
+      <button class="primary" id="copyBtn">Copia</button>
+    </div>
+    <div class="hr"></div>
+    <textarea id="orderText" placeholder="Premi “Genera ordine”…"></textarea>
+    <div class="muted small" id="savedHint" style="margin-top:8px;"></div>
+  </div>
+</main>
+
+<script>
+  const STORAGE_KEY = "restaurant_orders_v1";
+
+  const seedItems = [
+    // Alepat Taylor
+    { supplier:"Alepat Taylor", category:"Wine", item:"Fantini Calalenta Rosato", unit:"bt", stock:0, par:0, note:"" },
+    { supplier:"Alepat Taylor", category:"Wine", item:"Il Vignaiolo Pinot Grigio", unit:"bt", stock:0, par:0, note:"" },
+    { supplier:"Alepat Taylor", category:"Wine", item:"Cusumano Shamaris Grillo", unit:"bt", stock:0, par:0, note:"" },
+
+    // Winestock
+    { supplier:"Winestock", category:"Wine", item:"Viberti Moscato D'Asti", unit:"bt", stock:0, par:0, note:"" },
+    { supplier:"Winestock", category:"Wine", item:"Tenute Ulisse Rosè", unit:"bt", stock:0, par:0, note:"" },
+    { supplier:"Winestock", category:"Wine", item:"Terre Dei Miti Etna Bianco", unit:"bt", stock:0, par:0, note:"" },
+    { supplier:"Winestock", category:"Wine", item:"Tenute Ulisse Montepulciano Red", unit:"bt", stock:0, par:0, note:"" },
+    { supplier:"Winestock", category:"Wine", item:"Moscone Nebbiolo d'Alba", unit:"bt", stock:0, par:0, note:"" },
+
+    // Arquilla
+    { supplier:"Arquilla", category:"Beer", item:"Birra Messina", unit:"bt", stock:0, par:0, note:"" },
+    { supplier:"Arquilla", category:"Wine", item:"Soave", unit:"bt", stock:0, par:0, note:"" },
+    { supplier:"Arquilla", category:"Wine", item:"Planeta Etna Rosso", unit:"bt", stock:0, par:0, note:"" },
+    { supplier:"Arquilla", category:"Wine", item:"Zenato Valpolicella Classico Superiore", unit:"bt", stock:0, par:0, note:"" },
+    { supplier:"Arquilla", category:"Wine", item:"Barberasso Barbera Ripassa", unit:"bt", stock:0, par:0, note:"" },
+    { supplier:"Arquilla", category:"Wine", item:"Castellare Chianti Classico", unit:"bt", stock:0, par:0, note:"" },
+
+    // Twelve Bottles
+    { supplier:"Twelve Bottles", category:"Wine", item:"Argiolas Costamolino Vermentino", unit:"bt", stock:0, par:0, note:"" },
+    { supplier:"Twelve Bottles", category:"Wine", item:"Bricco Maiolica Langhe Nebbiolo", unit:"bt", stock:0, par:0, note:"" },
+    { supplier:"Twelve Bottles", category:"Wine", item:"Etna Rosso", unit:"bt", stock:0, par:0, note:"" },
+    { supplier:"Twelve Bottles", category:"Wine", item:"Bellavista Gran Cuvée Alma Franciacorta", unit:"bt", stock:0, par:0, note:"" },
+  ];
+
+  let state = { items: [], ui: { supplier:"ALL", onlyToOrder:false, search:"" } };
+
+  function load() {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) { state.items = seedItems; save(); return; }
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed?.items?.length) state = parsed;
+      else { state.items = seedItems; save(); }
+    } catch { state.items = seedItems; save(); }
+  }
+
+  function save() {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    const hint = document.getElementById("savedHint");
+    const now = new Date();
+    hint.textContent = "Salvato automaticamente • " + now.toLocaleString();
+  }
+
+  function uniqSuppliers(items){
+    return Array.from(new Set(items.map(x => x.supplier))).sort((a,b)=>a.localeCompare(b));
+  }
+
+  function calcToOrder(it){
+    const s = Number(it.stock)||0;
+    const p = Number(it.par)||0;
+    return Math.max(0, p - s);
+  }
+
+  function renderSupplierFilter(){
+    const sel = document.getElementById("supplierFilter");
+    const options = ["ALL", ...uniqSuppliers(state.items)];
+    sel.innerHTML = options.map(v => `<option value="${v}">${v === "ALL" ? "Tutti i supplier" : v}</option>`).join("");
+    sel.value = state.ui.supplier || "ALL";
+  }
+
+  function passesFilters(it){
+    const sOk = (state.ui.supplier === "ALL") || it.supplier === state.ui.supplier;
+    const q = (state.ui.search||"").trim().toLowerCase();
+    const searchOk = !q || (it.item.toLowerCase().includes(q) || it.category.toLowerCase().includes(q));
+    const orderOk = !state.ui.onlyToOrder || calcToOrder(it) > 0;
+    return sOk && searchOk && orderOk;
+  }
+
+  function renderList(){
+    const root = document.getElementById("list");
+    const items = state.items
+      .slice()
+      .sort((a,b)=>(a.supplier+a.category+a.item).localeCompare(b.supplier+b.category+b.item))
+      .filter(passesFilters);
+
+    if (!items.length){
+      root.innerHTML = `<div class="card"><div class="muted">Nessun item con questi filtri.</div></div>`;
+      return;
+    }
+
+    root.innerHTML = items.map((it, idx) => {
+      const toOrder = calcToOrder(it);
+      const pill = toOrder > 0 ? `<span class="pill">Da ordinare: <b>${toOrder}</b></span>` : `<span class="pill">OK</span>`;
+      const globalIndex = state.items.indexOf(it);
+
+      return `
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;">
+          <div>
+            <div style="font-weight:650;">${it.item}</div>
+            <div class="muted">${it.supplier} • ${it.category} • ${it.unit}</div>
+          </div>
+          <div>${pill}</div>
+        </div>
+
+        <div class="hr"></div>
+
+        <div class="grid">
+          <div class="muted">Stock</div>
+          <div class="muted qty">Par</div>
+          <div class="muted qty">Ordina</div>
+          <div class="muted qty">Azioni</div>
+
+          <input inputmode="numeric" value="${it.stock ?? 0}" data-field="stock" data-i="${globalIndex}">
+          <input class="qty" inputmode="numeric" value="${it.par ?? 0}" data-field="par" data-i="${globalIndex}">
+          <input class="qty" value="${toOrder}" disabled>
+          <button class="danger" data-del="${globalIndex}">X</button>
+        </div>
+
+        <div style="margin-top:10px;">
+          <input placeholder="Note (opzionale)" value="${it.note || ""}" data-field="note" data-i="${globalIndex}">
+        </div>
+      </div>`;
+    }).join("");
+
+    // Bind inputs
+    root.querySelectorAll("input[data-field]").forEach(inp => {
+      inp.addEventListener("input", e => {
+        const i = Number(e.target.dataset.i);
+        const field = e.target.dataset.field;
+        let val = e.target.value;
+        if (field === "stock" || field === "par") val = Number(val || 0);
+        state.items[i][field] = val;
+        save();
+        renderList(); // update computed
+      });
+    });
+
+    // Delete
+    root.querySelectorAll("button[data-del]").forEach(btn => {
+      btn.addEventListener("click", e => {
+        const i = Number(e.target.dataset.del);
+        if (!confirm("Eliminare questo item?")) return;
+        state.items.splice(i,1);
+        save();
+        renderSupplierFilter();
+        renderList();
+      });
+    });
+  }
+
+  function generateOrderText(){
+    const itemsToOrder = state.items
+      .map(it => ({...it, toOrder: calcToOrder(it)}))
+      .filter(it => it.toOrder > 0)
+      .sort((a,b)=>(a.supplier+a.item).localeCompare(b.supplier+b.item));
+
+    if (!itemsToOrder.length){
+      document.getElementById("orderText").value = "Niente da ordinare ✅";
+      return;
+    }
+
+    const bySupplier = new Map();
+    for (const it of itemsToOrder){
+      if (!bySupplier.has(it.supplier)) bySupplier.set(it.supplier, []);
+      bySupplier.get(it.supplier).push(it);
+    }
+
+    let out = "";
+    for (const [supplier, arr] of bySupplier.entries()){
+      out += `${supplier}\n`;
+      for (const it of arr){
+        out += `- ${it.item}: ${it.toOrder} ${it.unit}${it.note ? ` (${it.note})` : ""}\n`;
+      }
+      out += "\n";
+    }
+    document.getElementById("orderText").value = out.trim();
+  }
+
+  function copyOrder(){
+    const txt = document.getElementById("orderText").value || "";
+    navigator.clipboard.writeText(txt).then(()=>{
+      alert("Copiato ✅");
+    }).catch(()=>{
+      alert("Non riesco a copiare. Seleziona il testo e copia manualmente.");
+    });
+  }
+
+  function addItem(){
+    const supplier = prompt("Supplier (es. Winestock, Arquilla, Twelve Bottles):");
+    if (!supplier) return;
+    const item = prompt("Nome item:");
+    if (!item) return;
+    const category = prompt("Categoria (Wine/Beer/Spirits/Food…):", "Wine") || "Wine";
+    const unit = prompt("Unità (bt/kg/ctn…):", "bt") || "bt";
+    state.items.push({ supplier, category, item, unit, stock:0, par:0, note:"" });
+    save();
+    renderSupplierFilter();
+    renderList();
+  }
+
+  function resetAll(){
+    if (!confirm("Reset totale: ripristino lista iniziale e cancello modifiche. Sicuro?")) return;
+    state = { items: seedItems, ui: { supplier:"ALL", onlyToOrder:false, search:"" } };
+    save();
+    renderSupplierFilter();
+    renderList();
+    document.getElementById("orderText").value = "";
+  }
+
+  // Init
+  load();
+  renderSupplierFilter();
+  renderList();
+
+  // UI bindings
+  document.getElementById("supplierFilter").addEventListener("change", (e)=>{
+    state.ui.supplier = e.target.value;
+    save();
+    renderList();
+  });
+
+  document.getElementById("search").addEventListener("input", (e)=>{
+    state.ui.search = e.target.value;
+    save();
+    renderList();
+  });
+
+  document.getElementById("showAllBtn").addEventListener("click", ()=>{
+    state.ui.onlyToOrder = false;
+    save();
+    renderList();
+  });
+
+  document.getElementById("onlyToOrderBtn").addEventListener("click", ()=>{
+    state.ui.onlyToOrder = true;
+    save();
+    renderList();
+  });
+
+  document.getElementById("generateBtn").addEventListener("click", ()=>{
+    generateOrderText();
+    save();
+  });
+
+  document.getElementById("copyBtn").addEventListener("click", copyOrder);
+  document.getElementById("addItemBtn").addEventListener("click", addItem);
+  document.getElementById("resetBtn").addEventListener("click", resetAll);
+
+  // Service worker
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("service-worker.js").catch(()=>{});
+  }
+</script>
+</body>
+</html>
