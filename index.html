@@ -401,9 +401,11 @@
       display:flex;
       gap:8px;
       align-items:center;
+      flex-wrap:wrap;
     }
     .noteRow input{
-      width:100%;
+      flex:1 1 220px;
+      min-width: 180px;
       padding: 10px 12px;
       border-radius: 14px;
       border:1px solid var(--line);
@@ -604,14 +606,12 @@
       </div>
 
       <button class="iconBtn" id="manageBtn" title="Gestisci">
-        <!-- sliders icon -->
         <svg viewBox="0 0 24 24" fill="none">
           <path d="M4 7h10M18 7h2M12 7v10M4 17h6M14 17h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
         </svg>
       </button>
 
       <button class="iconBtn" id="orderBtnTop" title="Ordine">
-        <!-- receipt icon -->
         <svg viewBox="0 0 24 24" fill="none">
           <path d="M6 3h12v18l-2-1-2 1-2-1-2 1-2-1-2 1V3z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
           <path d="M9 7h6M9 11h6M9 15h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
@@ -653,14 +653,12 @@
   <div class="bottomBar">
     <div class="bottomInner">
       <button class="secondaryBtn" id="addItemBtn" title="Aggiungi item">
-        <!-- plus icon -->
         <svg viewBox="0 0 24 24" fill="none">
           <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
         </svg>
       </button>
 
       <button class="primaryBtn" id="generateBtn">
-        <!-- bolt icon -->
         <svg viewBox="0 0 24 24" fill="none">
           <path d="M13 2 3 14h7l-1 8 12-14h-7l-1-6z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
         </svg>
@@ -668,7 +666,6 @@
       </button>
 
       <button class="secondaryBtn" id="orderBtn" title="Apri ordine">
-        <!-- receipt icon -->
         <svg viewBox="0 0 24 24" fill="none">
           <path d="M6 3h12v18l-2-1-2 1-2-1-2 1-2-1-2 1V3z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
           <path d="M9 7h6M9 11h6M9 15h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
@@ -691,7 +688,6 @@
       </div>
       <div class="sheetActions">
         <button id="copyBtn" class="primary">
-          <!-- copy icon -->
           <svg viewBox="0 0 24 24" fill="none">
             <path d="M8 8h11v13H8V8z" stroke="currentColor" stroke-width="2" />
             <path d="M5 16H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h11a1 1 0 0 1 1 1v1" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
@@ -699,7 +695,6 @@
           Copia
         </button>
         <button id="closeSheetBtn">
-          <!-- x icon -->
           <svg viewBox="0 0 24 24" fill="none">
             <path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
           </svg>
@@ -716,31 +711,34 @@
 <div class="toast" id="toast">Copiato ✅</div>
 
 <script>
-  const STORAGE_KEY = "restaurant_orders_pro_v1";
+  const STORAGE_KEY = "restaurant_orders_pro_v2_prices";
+
+  // -------- valuta (modifica qui se vuoi) --------
+  const CURRENCY = "A$";
 
   // ----------------- SEED -----------------
   const seedItems = [
-    { supplier:"Alepat Taylor", category:"Wine", item:"Fantini Calalenta Rosato", unit:"bt", stock:0, par:0, note:"" },
-    { supplier:"Alepat Taylor", category:"Wine", item:"Il Vignaiolo Pinot Grigio", unit:"bt", stock:0, par:0, note:"" },
-    { supplier:"Alepat Taylor", category:"Wine", item:"Cusumano Shamaris Grillo", unit:"bt", stock:0, par:0, note:"" },
+    { supplier:"Alepat Taylor", category:"Wine", item:"Fantini Calalenta Rosato", unit:"bt", price:0, stock:0, par:0, note:"" },
+    { supplier:"Alepat Taylor", category:"Wine", item:"Il Vignaiolo Pinot Grigio", unit:"bt", price:0, stock:0, par:0, note:"" },
+    { supplier:"Alepat Taylor", category:"Wine", item:"Cusumano Shamaris Grillo", unit:"bt", price:0, stock:0, par:0, note:"" },
 
-    { supplier:"Winestock", category:"Wine", item:"Viberti Moscato D'Asti", unit:"bt", stock:0, par:0, note:"" },
-    { supplier:"Winestock", category:"Wine", item:"Tenute Ulisse Rosè", unit:"bt", stock:0, par:0, note:"" },
-    { supplier:"Winestock", category:"Wine", item:"Terre Dei Miti Etna Bianco", unit:"bt", stock:0, par:0, note:"" },
-    { supplier:"Winestock", category:"Wine", item:"Tenute Ulisse Montepulciano Red", unit:"bt", stock:0, par:0, note:"" },
-    { supplier:"Winestock", category:"Wine", item:"Moscone Nebbiolo d'Alba", unit:"bt", stock:0, par:0, note:"" },
+    { supplier:"Winestock", category:"Wine", item:"Viberti Moscato D'Asti", unit:"bt", price:0, stock:0, par:0, note:"" },
+    { supplier:"Winestock", category:"Wine", item:"Tenute Ulisse Rosè", unit:"bt", price:0, stock:0, par:0, note:"" },
+    { supplier:"Winestock", category:"Wine", item:"Terre Dei Miti Etna Bianco", unit:"bt", price:0, stock:0, par:0, note:"" },
+    { supplier:"Winestock", category:"Wine", item:"Tenute Ulisse Montepulciano Red", unit:"bt", price:0, stock:0, par:0, note:"" },
+    { supplier:"Winestock", category:"Wine", item:"Moscone Nebbiolo d'Alba", unit:"bt", price:0, stock:0, par:0, note:"" },
 
-    { supplier:"Arquilla", category:"Beer", item:"Birra Messina", unit:"bt", stock:0, par:0, note:"" },
-    { supplier:"Arquilla", category:"Wine", item:"Soave", unit:"bt", stock:0, par:0, note:"" },
-    { supplier:"Arquilla", category:"Wine", item:"Planeta Etna Rosso", unit:"bt", stock:0, par:0, note:"" },
-    { supplier:"Arquilla", category:"Wine", item:"Zenato Valpolicella Classico Superiore", unit:"bt", stock:0, par:0, note:"" },
-    { supplier:"Arquilla", category:"Wine", item:"Barberasso Barbera Ripassa", unit:"bt", stock:0, par:0, note:"" },
-    { supplier:"Arquilla", category:"Wine", item:"Castellare Chianti Classico", unit:"bt", stock:0, par:0, note:"" },
+    { supplier:"Arquilla", category:"Beer", item:"Birra Messina", unit:"bt", price:0, stock:0, par:0, note:"" },
+    { supplier:"Arquilla", category:"Wine", item:"Soave", unit:"bt", price:0, stock:0, par:0, note:"" },
+    { supplier:"Arquilla", category:"Wine", item:"Planeta Etna Rosso", unit:"bt", price:0, stock:0, par:0, note:"" },
+    { supplier:"Arquilla", category:"Wine", item:"Zenato Valpolicella Classico Superiore", unit:"bt", price:0, stock:0, par:0, note:"" },
+    { supplier:"Arquilla", category:"Wine", item:"Barberasso Barbera Ripassa", unit:"bt", price:0, stock:0, par:0, note:"" },
+    { supplier:"Arquilla", category:"Wine", item:"Castellare Chianti Classico", unit:"bt", price:0, stock:0, par:0, note:"" },
 
-    { supplier:"Twelve Bottles", category:"Wine", item:"Argiolas Costamolino Vermentino", unit:"bt", stock:0, par:0, note:"" },
-    { supplier:"Twelve Bottles", category:"Wine", item:"Bricco Maiolica Langhe Nebbiolo", unit:"bt", stock:0, par:0, note:"" },
-    { supplier:"Twelve Bottles", category:"Wine", item:"Etna Rosso", unit:"bt", stock:0, par:0, note:"" },
-    { supplier:"Twelve Bottles", category:"Wine", item:"Bellavista Gran Cuvée Alma Franciacorta", unit:"bt", stock:0, par:0, note:"" },
+    { supplier:"Twelve Bottles", category:"Wine", item:"Argiolas Costamolino Vermentino", unit:"bt", price:0, stock:0, par:0, note:"" },
+    { supplier:"Twelve Bottles", category:"Wine", item:"Bricco Maiolica Langhe Nebbiolo", unit:"bt", price:0, stock:0, par:0, note:"" },
+    { supplier:"Twelve Bottles", category:"Wine", item:"Etna Rosso", unit:"bt", price:0, stock:0, par:0, note:"" },
+    { supplier:"Twelve Bottles", category:"Wine", item:"Bellavista Gran Cuvée Alma Franciacorta", unit:"bt", price:0, stock:0, par:0, note:"" },
   ];
 
   const seedSuppliers = Array.from(new Set(seedItems.map(x => x.supplier))).sort((a,b)=>a.localeCompare(b));
@@ -757,6 +755,12 @@
 
   function uniq(arr){ return Array.from(new Set(arr)); }
   function clean(s){ return (s||"").trim().replace(/\s+/g," "); }
+
+  function parseMoney(v){
+    const n = Number(String(v ?? "").replace(",", "."));
+    if (!Number.isFinite(n) || n < 0) return 0;
+    return n;
+  }
 
   function calcToOrder(it){
     const s = Number(it.stock)||0;
@@ -789,11 +793,13 @@
       out.suppliers = uniq(out.items.map(x=>x.supplier)).map(clean).sort((a,b)=>a.localeCompare(b));
     }
 
+    // include price
     out.items = out.items.map(it => ({
       supplier: clean(it.supplier),
       category: clean(it.category || "Wine") || "Wine",
       item: clean(it.item),
       unit: clean(it.unit || "bt") || "bt",
+      price: Math.max(0, Number(it.price || 0) || 0),
       stock: Number(it.stock)||0,
       par: Number(it.par)||0,
       note: it.note || ""
@@ -906,6 +912,8 @@
         ? `<div class="pill todo">Da ordinare: <b>${toOrder}</b> ${escapeHtml(it.unit)}</div>`
         : `<div class="pill ok">OK</div>`;
 
+      const priceTxt = `${CURRENCY}${Number(it.price || 0).toFixed(2)}`;
+
       return `
         <div class="itemCard" data-i="${idx}">
           <div class="itemTop">
@@ -915,6 +923,9 @@
                 <span class="badge"><span style="opacity:.7;">Supplier</span> <b>${escapeHtml(it.supplier)}</b></span>
                 <span class="badge"><span style="opacity:.7;">Cat</span> <b>${escapeHtml(it.category)}</b></span>
                 <span class="badge"><span style="opacity:.7;">Unit</span> <b>${escapeHtml(it.unit)}</b></span>
+                <span class="badge" style="cursor:pointer;" title="Tocca per cambiare prezzo" data-price>
+                  <span style="opacity:.7;">Prezzo</span> <b>${escapeHtml(priceTxt)}</b>
+                </span>
               </div>
             </div>
             ${pill}
@@ -954,6 +965,13 @@
 
           <div class="noteRow">
             <input placeholder="Note (opzionale)" data-field="note" value="${escapeHtml(it.note || "")}">
+            <button class="ghostBtn" data-edit title="Modifica item">
+              <svg viewBox="0 0 24 24" fill="none">
+                <path d="M4 20h4l10.5-10.5a2 2 0 0 0 0-2.8l-1.2-1.2a2 2 0 0 0-2.8 0L4 16v4z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+                <path d="M13.5 6.5l4 4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              </svg>
+              Modifica
+            </button>
             <button class="ghostBtn dangerBtn" data-del title="Elimina item">
               <svg viewBox="0 0 24 24" fill="none">
                 <path d="M4 7h16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
@@ -971,6 +989,27 @@
     root.querySelectorAll(".itemCard").forEach(card => {
       const i = Number(card.dataset.i);
       const it = state.items[i];
+
+      // change price quickly
+      const priceBadge = card.querySelector("[data-price]");
+      if (priceBadge){
+        priceBadge.addEventListener("click", ()=>{
+          const v = prompt("Prezzo unitario (es. 18.50). Lascia vuoto per 0.", String(Number(it.price||0)));
+          if (v === null) return;
+          it.price = parseMoney(v);
+          save();
+          render();
+          toast("Prezzo aggiornato");
+        });
+      }
+
+      // edit item
+      const editBtn = card.querySelector("button[data-edit]");
+      if (editBtn){
+        editBtn.addEventListener("click", ()=>{
+          editItemFlow(i);
+        });
+      }
 
       // stepper +/- buttons
       card.querySelectorAll("button[data-step]").forEach(btn => {
@@ -995,9 +1034,8 @@
           }
           it[field] = v;
           save();
-          renderStats(); // lighter update
+          renderStats();
           renderMeta();
-          // refresh only pill? easiest: full render after debounce
           debounceRender();
         });
       });
@@ -1019,6 +1057,64 @@
     _deb = setTimeout(()=>render(), 120);
   }
 
+  // ----------------- EDIT ITEM FLOW -----------------
+  function editItemFlow(index){
+    const it = state.items[index];
+    if (!it) return;
+
+    const newName = clean(prompt("Nome item:", it.item));
+    if (!newName) return;
+
+    const sortedSuppliers = state.suppliers.slice().sort((a,b)=>a.localeCompare(b));
+    const supplierChoice = prompt(
+      "Supplier:\n\n" +
+      sortedSuppliers.map((s,i)=>`${i+1}. ${s}`).join("\n") +
+      "\n\nScrivi il numero oppure scrivi un nuovo nome supplier:",
+      it.supplier
+    );
+    if (supplierChoice === null) return;
+
+    let newSupplier = clean(supplierChoice);
+    const n = Number(supplierChoice);
+    if (Number.isFinite(n) && n >= 1 && n <= sortedSuppliers.length){
+      newSupplier = sortedSuppliers[n-1];
+    }
+    if (!newSupplier) return;
+
+    const newCategory = clean(prompt("Categoria:", it.category || "Wine")) || "Wine";
+    const newUnit = clean(prompt("Unità (bt/kg/ctn…):", it.unit || "bt")) || "bt";
+
+    const priceStr = prompt("Prezzo unitario (es. 18.50):", String(Number(it.price||0)));
+    if (priceStr === null) return;
+    const newPrice = parseMoney(priceStr);
+
+    // avoid duplicates supplier+item
+    const duplicate = state.items.some((x, idx) =>
+      idx !== index &&
+      x.supplier.toLowerCase() === newSupplier.toLowerCase() &&
+      x.item.toLowerCase() === newName.toLowerCase()
+    );
+    if (duplicate){
+      alert("Esiste già un item con questo nome per quel supplier.");
+      return;
+    }
+
+    it.item = newName;
+    it.supplier = newSupplier;
+    it.category = newCategory;
+    it.unit = newUnit;
+    it.price = newPrice;
+
+    if (!state.suppliers.some(s => s.toLowerCase() === newSupplier.toLowerCase())){
+      state.suppliers.push(newSupplier);
+      state.suppliers.sort((a,b)=>a.localeCompare(b));
+    }
+
+    save();
+    render();
+    toast("Item aggiornato");
+  }
+
   // ----------------- ORDER (SHEET) -----------------
   function openSheet(){
     $("backdrop").classList.add("on");
@@ -1029,31 +1125,51 @@
     $("sheet").classList.remove("on");
   }
 
+  // order with totals per supplier + grand total
   function generateOrderText(){
-    const itemsToOrder = state.items
-      .map(it => ({...it, toOrder: calcToOrder(it)}))
-      .filter(it => it.toOrder > 0)
+    const rows = state.items
+      .map(it => {
+        const qty = calcToOrder(it);
+        if (qty <= 0) return null;
+        const price = Math.max(0, Number(it.price||0) || 0);
+        const lineTotal = qty * price;
+        return { ...it, qty, price, lineTotal };
+      })
+      .filter(Boolean)
       .sort((a,b)=>(a.supplier+a.item).localeCompare(b.supplier+b.item));
 
-    if (!itemsToOrder.length){
+    if (!rows.length){
       $("orderText").value = "Niente da ordinare ✅";
       return;
     }
 
     const bySupplier = new Map();
-    for (const it of itemsToOrder){
-      if (!bySupplier.has(it.supplier)) bySupplier.set(it.supplier, []);
-      bySupplier.get(it.supplier).push(it);
+    for (const r of rows){
+      if (!bySupplier.has(r.supplier)) bySupplier.set(r.supplier, []);
+      bySupplier.get(r.supplier).push(r);
     }
 
+    let grandTotal = 0;
     let out = "";
+
     for (const [supplier, arr] of bySupplier.entries()){
+      let supplierTotal = 0;
+
       out += `${supplier}\n`;
-      for (const it of arr){
-        out += `- ${it.item}: ${it.toOrder} ${it.unit}${it.note ? ` (${it.note})` : ""}\n`;
+      for (const r of arr){
+        supplierTotal += r.lineTotal;
+
+        const priceTxt = `${CURRENCY}${(r.price || 0).toFixed(2)}`;
+        const lineTxt = (r.price > 0) ? ` = ${CURRENCY}${r.lineTotal.toFixed(2)}` : "";
+
+        out += `- ${r.item}: ${r.qty} ${r.unit} x ${priceTxt}${lineTxt}${r.note ? ` (${r.note})` : ""}\n`;
       }
-      out += "\n";
+
+      grandTotal += supplierTotal;
+      out += `Totale ${supplier}: ${CURRENCY}${supplierTotal.toFixed(2)}\n\n`;
     }
+
+    out += `TOTALE GENERALE: ${CURRENCY}${grandTotal.toFixed(2)}`;
     $("orderText").value = out.trim();
   }
 
@@ -1146,6 +1262,9 @@
 
     const category = clean(prompt("Categoria (Wine/Beer/Spirits/Food…):", "Wine")) || "Wine";
     const unit = clean(prompt("Unità (bt/kg/ctn…):", "bt")) || "bt";
+    const priceStr = prompt("Prezzo unitario (opzionale, es. 18.50):", "0");
+    if (priceStr === null) return;
+    const price = parseMoney(priceStr);
 
     const exists = state.items.some(x =>
       x.supplier.toLowerCase() === supplier.toLowerCase() &&
@@ -1156,7 +1275,7 @@
       return;
     }
 
-    state.items.push({ supplier, category, item, unit, stock:0, par:0, note:"" });
+    state.items.push({ supplier, category, item, unit, price, stock:0, par:0, note:"" });
     save();
     render();
     toast("Item aggiunto");
@@ -1214,7 +1333,6 @@
     renderStats();
     renderMeta();
     renderList();
-    // toggle UI
     const t = $("onlyToggle");
     if (state.ui.onlyToOrder) t.classList.add("on"); else t.classList.remove("on");
   }
